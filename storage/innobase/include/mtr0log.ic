@@ -207,6 +207,7 @@ byte *mlog_write_initial_log_record_fast(
 
   page = (const byte *)ut_align_down(ptr, UNIV_PAGE_SIZE);
   space = mach_read_from_4(page + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
+  /* FIL_PAGE_OFFSET 记录 Page NO. */
   offset = mach_read_from_4(page + FIL_PAGE_OFFSET);
 
   /* check whether the page is in the doublewrite buffer;

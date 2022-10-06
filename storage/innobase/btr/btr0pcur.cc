@@ -104,12 +104,14 @@ void btr_pcur_t::store_position(mtr_t *mtr) {
 
   m_old_stored = true;
 
+  /* 保存当前指向的 record 至 m_old_rec. */
   m_old_rec = dict_index_copy_rec_order_prefix(index, rec, &m_old_n_fields,
                                                &m_old_rec_buf, &m_buf_size);
 
   m_block_when_stored.store(block);
 
   /* Function try to check if block is S/X latch. */
+  /* 记录 modify clock. */
   m_modify_clock = buf_block_get_modify_clock(block);
 }
 
@@ -182,6 +184,7 @@ bool btr_pcur_t::restore_position(ulint latch_mode, mtr_t *mtr,
        latch_mode == BTR_SEARCH_PREV || latch_mode == BTR_MODIFY_PREV) &&
       !m_btr_cur.index->table->is_intrinsic()) {
     /* Try optimistic restoration. */
+    /* 乐观恢复. */
     if (m_block_when_stored.run_with_hint([&](buf_block_t *hint) {
           return hint != nullptr && btr_cur_optimistic_latch_leaves(
                                         hint, m_modify_clock, &latch_mode,
@@ -251,6 +254,7 @@ bool btr_pcur_t::restore_position(ulint latch_mode, mtr_t *mtr,
       ut_error;
   }
 
+  /* 乐观恢复 pcur 失败，就要通过 btr_cur_search_to_nth_level 来重新定位 pcur. */
   open_no_init(index, tuple, mode, latch_mode, 0, mtr, file, line);
 
   /* Restore the old search mode */

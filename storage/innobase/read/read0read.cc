@@ -438,8 +438,12 @@ void ReadView::prepare(trx_id_t id) {
 
   ut_ad(m_up_limit_id <= m_low_limit_id);
 
-  /* serialisation_list 是事务的提交顺序列表, 在 undo log purge 阶段,
-   * 小于 m_low_limit_no 的 undo log 都可以进行 purge. */
+  /* serialisation_list 是事务的提交顺序列表, 在这里获取所有提交中事务最小的
+   * trx_no, 在 undo log purge 阶段, 如果这个 read-view 是 oldest read-view
+   * 那么小于 m_low_limit_no 的 undo log 都可以进行 purge.
+   *
+   * trx_no 代表的是当时事务列表里尚未开启的最大的 trx_id, 所有小于该 trx_no 的
+   * 事务都不可能被其他活跃事务读取, 所以可以安全的被 purge. */
   if (UT_LIST_GET_LEN(trx_sys->serialisation_list) > 0) {
     const trx_t *trx;
 

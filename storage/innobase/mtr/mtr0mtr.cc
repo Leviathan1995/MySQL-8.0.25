@@ -528,6 +528,7 @@ struct mtr_write_log_t {
       log_buffer_set_first_record_group(*log_sys, m_handle, end_lsn);
     }
 
+    /* 更新 log.recent_written. */
     log_buffer_write_completed(*log_sys, m_handle, start_lsn, end_lsn);
 
     m_lsn = end_lsn;
@@ -849,10 +850,12 @@ void mtr_t::Command::execute() {
     ut_ad(write_log.m_left_to_write == 0);
     ut_ad(write_log.m_lsn == handle.end_lsn);
 
+    /* 写完 redo log 更新 log.recent_closed. */
     log_wait_for_space_in_log_recent_closed(*log_sys, handle.start_lsn);
 
     DEBUG_SYNC_C("mtr_redo_before_add_dirty_blocks");
 
+    /* 将脏页插入 flush_list. */
     add_dirty_blocks_to_flush_list(handle.start_lsn, handle.end_lsn);
 
     log_buffer_close(*log_sys, handle);

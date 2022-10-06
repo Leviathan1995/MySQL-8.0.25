@@ -995,6 +995,7 @@ static MY_ATTRIBUTE((warn_unused_result)) dberr_t
 
   log_header_creator[(sizeof log_header_creator) - 1] = 0;
 
+  /* 检查 log 格式. */
   switch (log.format) {
     case 0:
       ib::error(ER_IB_MSG_1265) << "Unsupported redo log format (" << log.format
@@ -1983,6 +1984,7 @@ static byte *recv_parse_or_apply_log_rec_body(
         ut_a(!page ||
              (ibool) !!page_is_comp(page) == dict_table_is_comp(index->table));
 
+        /* 回放 insert 操作. */
         ptr = page_cur_parse_insert_rec(FALSE, ptr, end_ptr, block, index, mtr);
       }
 
@@ -3313,6 +3315,7 @@ bool meb_scan_log_recs(
 
     ulint expected_no = log_block_convert_lsn_to_no(scanned_lsn);
 
+    /* 校验 log block no. */
     if (no != expected_no) {
       /* Garbage or an incompletely written log block.
 
@@ -3326,6 +3329,7 @@ bool meb_scan_log_recs(
       break;
     }
 
+    /* 校验 checksum. */
     if (!log_block_checksum_is_ok(log_block)) {
       uint32_t checksum1 = log_block_get_checksum(log_block);
       uint32_t checksum2 = log_block_calc_checksum(log_block);
@@ -3499,9 +3503,13 @@ bool meb_scan_log_recs(
   if (more_data && !recv_sys->found_corrupt_log) {
     /* Try to parse more log records */
 
+    /* parse redo log 并添加至 hash table. */
     recv_parse_log_recs(checkpoint_lsn);
 
 #ifndef UNIV_HOTBACKUP
+    /* 假如 hash table 超过了 max_memory, 需要进行 apply.
+     * max_memory 的设定是 Buffer Pool 的大小, 因为当前处于 recovery
+     * 状态, 所以暂时借用 Buffer Pool 的内存. */
     if (recv_heap_used() > max_memory) {
       recv_apply_hashed_log_recs(log, false);
     }
@@ -3698,6 +3706,7 @@ static void recv_recovery_begin(log_t &log, lsn_t *contiguous_lsn) {
   while (!finished) {
     lsn_t end_lsn = start_lsn + RECV_SCAN_SIZE;
 
+    /* 单纯的读 redo log. */
     recv_read_log_seg(log, log.buf, start_lsn, end_lsn);
 
     finished = recv_scan_log_recs(log, max_mem, log.buf, RECV_SCAN_SIZE,

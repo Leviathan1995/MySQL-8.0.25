@@ -877,6 +877,18 @@ namespace dd {
 class Spatial_reference_system;
 }
 
+/*
+ * index->table->n_cols: table 的列数，包含用户定义的列 + 3 列系统列(DB_ROW_ID, DB_TRX_ID, DB_ROLL_PTR).
+ * index->table->cols: 存上面 n_cols 个列的数组，系统列在倒数后3个.
+ * index->n_fields: 当前索引包含的列数，这里要注意它一定是小于等于上面的 index->table->n_cols.
+ *
+ * 对于主键索引 leaf node:
+ * 1. 如果定义了主键，那么系统列就没有 DB_ROW_ID，那么此时 n_fields 比 n_cols 小 1.
+ * 2. 如果没有定义主键，那么系统列就包含 DB_ROW_ID，那么此时二者一样.
+ *
+ * 对于二级索引 leaf node:
+ * 1. n_fields 就是包含二级索引定义的列数 + 主键列数 */
+
 /** Data structure for an index.  Most fields will be
 initialized to 0, NULL or FALSE in dict_mem_index_create(). */
 struct dict_index_t {

@@ -2937,6 +2937,7 @@ static dict_index_t *dict_index_build_internal_clust(
     new_index->n_uniq = new_index->n_def;
   } else {
     /* Also the row id is needed to identify the entry */
+    /* 不是唯一索引, 需要 row id 来区分唯一性. */
     new_index->n_uniq = 1 + new_index->n_def;
   }
 
@@ -2947,11 +2948,13 @@ static dict_index_t *dict_index_build_internal_clust(
   trx_id_pos = new_index->n_def;
 
   if (!dict_index_is_unique(index)) {
+    /* 不是唯一索引, 所以主键索引需要加一列 row id. */
     dict_index_add_col(new_index, table, table->get_sys_col(DATA_ROW_ID), 0,
                        true);
     trx_id_pos++;
   }
 
+  /* 主键索引加一列 trx id. */
   dict_index_add_col(new_index, table, table->get_sys_col(DATA_TRX_ID), 0,
                      true);
 
@@ -2992,6 +2995,7 @@ static dict_index_t *dict_index_build_internal_clust(
   DATA_ROLL_PTR system columns are not added as default system
   columns to such tables. */
   if (!table->is_intrinsic()) {
+    /* 主键索引需要加一列 roll ptr. */
     dict_index_add_col(new_index, table, table->get_sys_col(DATA_ROLL_PTR), 0,
                        true);
   }

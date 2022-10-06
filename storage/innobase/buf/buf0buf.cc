@@ -1032,12 +1032,15 @@ static buf_chunk_t *buf_chunk_init(
   it is bigger, we may allocate more blocks than requested. */
 
   frame = (byte *)ut_align(chunk->mem, UNIV_PAGE_SIZE);
+  /* 计算单个 chunk 可以分配多少个数据 page. */
   chunk->size = chunk->mem_pfx.m_size / UNIV_PAGE_SIZE - (frame != chunk->mem);
 
   /* Subtract the space needed for block descriptors. */
   {
     ulint size = chunk->size;
 
+    /* 为 blocks 预留空间, 所以 chunk 内的布局空间是前半部分存放 block,
+     * 后半部分存放 frame. */
     while (frame < (byte *)(chunk->blocks + size)) {
       frame += UNIV_PAGE_SIZE;
       size--;
@@ -1052,6 +1055,7 @@ static buf_chunk_t *buf_chunk_init(
 
   block = chunk->blocks;
 
+  /* 初始化 block. */
   for (i = chunk->size; i--;) {
     buf_block_init(buf_pool, block, frame);
     UNIV_MEM_INVALID(block->frame, UNIV_PAGE_SIZE);
@@ -1310,6 +1314,7 @@ static void buf_pool_create(buf_pool_t *buf_pool, ulint buf_pool_size,
     ut_a(srv_n_page_hash_locks != 0);
     ut_a(srv_n_page_hash_locks <= MAX_PAGE_HASH_LOCKS);
 
+    /* 初始化 page hash. */
     buf_pool->page_hash =
         ib_create(2 * buf_pool->curr_size, LATCH_ID_HASH_TABLE_RW_LOCK,
                   srv_n_page_hash_locks, MEM_HEAP_FOR_PAGE_HASH);
@@ -4678,6 +4683,7 @@ static void buf_page_init(buf_pool_t *buf_pool, const page_id_t &page_id,
   ut_a(block->page.id == page_id);
   block->page.size.copy_from(page_size);
 
+  /* 插入 page hash. */
   HASH_INSERT(buf_page_t, hash, buf_pool->page_hash, page_id.fold(),
               &block->page);
 
@@ -4825,6 +4831,7 @@ buf_page_t *buf_page_init_for_read(dberr_t *err, ulint mode,
     read is completed.  The x-lock is cleared by the
     io-handler thread. */
 
+    /* Page 加 X 锁. */
     rw_lock_x_lock_gen(&block->lock, BUF_IO_READ);
 
     rw_lock_x_unlock(hash_lock);

@@ -9898,6 +9898,8 @@ int ha_innobase::index_read(
     /* Convert the search key value to InnoDB format into
     m_prebuilt->search_tuple */
 
+    /* 将一个 server 层格式的 key-value 转换为 InnoDB 格式,
+     * 具体包含的 field 数量由其长度决定. */
     row_sel_convert_mysql_key_to_innobase(
         m_prebuilt->search_tuple, m_prebuilt->srch_key_val1,
         m_prebuilt->srch_key_val_len, index, key_ptr, key_len, m_prebuilt->trx);

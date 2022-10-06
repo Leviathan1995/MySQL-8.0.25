@@ -868,6 +868,7 @@ dberr_t SysTablespace::open_or_create(bool is_temp, bool create_new_db,
   if (!create_new_db && flush_lsn) {
     /* Validate the header page in the first datafile
     and read LSNs fom the others. */
+    /* flush_lsn 写在系统表, 在每次 shutdown 的时候写入. */
     err = read_lsn_and_check_flags(flush_lsn);
     if (err != DB_SUCCESS) {
       return (err);

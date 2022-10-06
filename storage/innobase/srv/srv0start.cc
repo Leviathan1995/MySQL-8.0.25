@@ -2443,6 +2443,8 @@ files_checked:
     }
 
   } else {
+    /* IF NOT create_new_db. */
+
     /* Load the reserved boundaries of the legacy dblwr buffer, this is
     requird to check for stray reads and writes trying to access this
     reserved region in the sys tablespace.

@@ -375,7 +375,7 @@ void dict_build_index_def(const dict_table_t *table, /*!< in: table */
   /* Inherit the space id from the table; we store all indexes of a
   table in the same tablespace */
 
-  /* 索引的的 space id 沿用表的. */
+  /* 索引的 space id 沿用表的. */
   index->space = table->space;
 
   /* Note that the index was created by this transaction. */

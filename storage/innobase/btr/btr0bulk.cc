@@ -279,6 +279,7 @@ void PageBulk::finish() {
 
   ulint n_rec_to_assign = m_rec_no - m_slotted_rec_no;
 
+  /* 将 Page 内的 record 拆分到各个 Page Directory Slot. */
   /* Fill slots for non-supremum records if possible.
    Slot for supremum record could store up to
    PAGE_DIR_SLOT_MAX_N_OWNED-1 records. */
@@ -297,7 +298,9 @@ void PageBulk::finish() {
 
     /* Fill the slot data. */
     auto slot = page_dir_get_nth_slot(m_page, n_slots - 1);
+    /* 记录 record 在 page 内的偏移. */
     page_dir_slot_set_rec(slot, m_last_slotted_rec);
+    /* 记录该 slot 有多少 record. */
     page_dir_slot_set_n_owned(slot, nullptr, RECORDS_PER_SLOT);
 
     n_rec_to_assign -= RECORDS_PER_SLOT;
@@ -308,6 +311,7 @@ void PageBulk::finish() {
   auto slot = page_dir_get_nth_slot(m_page, n_slots - 1);
   auto sup_rec = page_get_supremum_rec(m_page);
 
+  /* 更新 supremum record. */
   page_dir_slot_set_rec(slot, sup_rec);
   page_dir_slot_set_n_owned(slot, nullptr, n_rec_to_assign + 1);
 

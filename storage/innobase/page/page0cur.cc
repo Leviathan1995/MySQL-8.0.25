@@ -466,6 +466,7 @@ void page_cur_search_with_match(const buf_block_t *block,
   directory, after that as a linear search in the list of records
   owned by the upper limit directory slot. */
 
+  /* 二分查找. */
   low = 0;
   up = page_dir_get_n_slots(page) - 1;
 
@@ -474,6 +475,7 @@ void page_cur_search_with_match(const buf_block_t *block,
 
   while (up - low > 1) {
     mid = (low + up) / 2;
+    /* 获取中间的 slot, 并获取对应的 record. */
     slot = page_dir_get_nth_slot(page, mid);
     mid_rec = page_dir_slot_get_rec(slot);
 
@@ -488,6 +490,7 @@ void page_cur_search_with_match(const buf_block_t *block,
                                 dtuple_get_n_fields_cmp(tuple), &heap);
     }
 
+    /* 比较 mid_rec 和 search_tuple. */
     cmp = tuple->compare(mid_rec, index, offsets, &cur_matched_fields);
 
     if (cmp > 0) {
@@ -518,6 +521,7 @@ void page_cur_search_with_match(const buf_block_t *block,
     }
   }
 
+  /* 获取数据 page 内的 dir slot. */
   slot = page_dir_get_nth_slot(page, low);
   low_rec = page_dir_slot_get_rec(slot);
   slot = page_dir_get_nth_slot(page, up);
@@ -585,6 +589,7 @@ void page_cur_search_with_match(const buf_block_t *block,
     }
   }
 
+  /* 将对应的 record 保存在 cursor 内. */
   if (mode <= PAGE_CUR_GE) {
     page_cur_position(up_rec, block, cursor);
   } else {
@@ -960,6 +965,7 @@ static void page_cur_insert_rec_write_log(
 
     log_end = &log_ptr[2 + 5 + 1 + 5 + 5 + MLOG_BUF_MARGIN];
     /* Write the cursor rec offset as a 2-byte ulint */
+    /* 记录 rec 在 page 中 offset. */
     mach_write_to_2(log_ptr, page_offset(cursor_rec));
     log_ptr += 2;
   } else {
@@ -1064,6 +1070,7 @@ byte *page_cur_parse_insert_rec(
       return (nullptr);
     }
 
+    /* 获取 cursor record 在 page 中 offset. */
     offset = mach_read_from_2(ptr);
     ptr += 2;
 
@@ -1129,6 +1136,7 @@ byte *page_cur_parse_insert_rec(
   /* Read from the log the inserted index record end segment which
   differs from the cursor record */
 
+  /* 获取 cursor_rec 的 offsets 数组. */
   offsets = rec_get_offsets(cursor_rec, index, offsets, ULINT_UNDEFINED, &heap);
 
   if (!(end_seg_len & 0x1UL)) {
@@ -1168,6 +1176,7 @@ byte *page_cur_parse_insert_rec(
     rec_set_info_bits_old(buf + origin_offset, info_and_status_bits);
   }
 
+  /* 将 cursor 定位到 cursor_rec. */
   page_cur_position(cursor_rec, block, &cursor);
 
   offsets = rec_get_offsets(buf + origin_offset, index, offsets,

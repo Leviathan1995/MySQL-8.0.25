@@ -701,6 +701,7 @@ void btr_cur_search_to_nth_level(
   cursor->low_match = ULINT_UNDEFINED;
 #endif /* UNIV_DEBUG */
 
+  /* 检查是否已经持有 index 的 S 锁. */
   bool s_latch_by_caller = latch_mode & BTR_ALREADY_S_LATCHED;
   latch_mode &= ~BTR_ALREADY_S_LATCHED;
 
@@ -824,6 +825,7 @@ void btr_cur_search_to_nth_level(
 
         mtr_x_lock(dict_index_get_lock(index), mtr);
       } else {
+        /* 普通的 modify tree 为 index 加 sx 锁. */
         mtr_sx_lock(dict_index_get_lock(index), mtr);
       }
       upper_rw_latch = RW_X_LATCH;
@@ -857,16 +859,21 @@ void btr_cur_search_to_nth_level(
           BTR_ALREADY_S_LATCHED */
           ut_ad(latch_mode != BTR_SEARCH_TREE);
 
+          /* BTR_MODIFY_LEAF 对 index 加 s 锁.*/
           mtr_s_lock(dict_index_get_lock(index), mtr);
         } else {
           /* BTR_MODIFY_EXTERNAL needs to be excluded */
           mtr_sx_lock(dict_index_get_lock(index), mtr);
         }
+        /* search 过程中的 page 加 s 锁. */
         upper_rw_latch = RW_S_LATCH;
       } else {
         upper_rw_latch = RW_NO_LATCH;
       }
   }
+
+  /* 根据 latch_mode(BTR_SEARCH_LEAF...) 来判断 root page 的加锁类型,
+   * 仅在 b+ tree 的层级只有一层时使用. */
   root_leaf_rw_latch = btr_cur_latch_for_root_leaf(latch_mode);
 
   page_cursor = btr_cur_get_page_cur(cursor);
@@ -875,6 +882,7 @@ void btr_cur_search_to_nth_level(
   const page_size_t page_size(dict_table_page_size(index->table));
 
   /* Start with the root page. */
+  /* 开始 search 流程. */
   page_id_t page_id(space, dict_index_get_page(index));
 
   if (root_leaf_rw_latch == RW_X_LATCH) {
@@ -886,12 +894,17 @@ void btr_cur_search_to_nth_level(
   low_match = 0;
   low_bytes = 0;
 
+  /* height 代表当前 search 过程中所在的 level 层级. */
   height = ULINT_UNDEFINED;
 
   /* We use these modified search modes on non-leaf levels of the
   B-tree. These let us end up in the right B-tree leaf. In that leaf
   we use the original search mode. */
 
+  /* 当使用 PAGE_CUR_GE 来搜索 record 的时候，在非叶子
+   * 节点使用的 PAGE_CUR_L;
+   * 当使用 PAGE_CUR_G 来搜索 record 的时候，在非叶子
+   * 节点使用的 PAGE_CUR_LE. */
   switch (mode) {
     case PAGE_CUR_GE:
       page_mode = PAGE_CUR_L;
@@ -920,6 +933,8 @@ search_loop:
   rtree_parent_modified = false;
 
   if (height != 0) {
+    /* height 代表当前 search 过程中所在的层级. */
+    /* BTR_MODIFY_LEAF 对于 non-leaf page 使用 s 锁. */
     /* We are about to fetch the root or a non-leaf page. */
     if ((latch_mode != BTR_MODIFY_TREE || height == level) &&
         !retrying_for_search_prev) {
@@ -935,6 +950,7 @@ search_loop:
       }
     }
   } else if (latch_mode <= BTR_MODIFY_LEAF) {
+    /* BTR_MODIFY_LEAF 对于 leaf page 使用 x 锁. */
     rw_latch = latch_mode;
 
     if (btr_op != BTR_NO_OP &&
@@ -1096,6 +1112,8 @@ retry_page_get:
   if (UNIV_UNLIKELY(height == ULINT_UNDEFINED)) {
     /* We are in the root node */
 
+    /* 当前位于 root page, 获取 root page 所处的层级,
+     * 叶子节点为 0 层, height + 1 即为当前 B+tree 的层数. */
     height = btr_page_get_level(page, mtr);
     root_height = height;
     cursor->tree_height = root_height + 1;
@@ -1126,6 +1144,7 @@ retry_page_get:
   }
 
   if (height == 0) {
+    /* We are in the leaf node. */
     if (rw_latch == RW_NO_LATCH) {
       latch_leaves = btr_cur_latch_leaves(block, page_id, page_size, latch_mode,
                                           cursor, mtr);
@@ -1243,12 +1262,14 @@ retry_page_get:
     for leaf pages (height==0), but not in r-trees.
     We only need the byte prefix comparison for the purpose
     of updating the adaptive hash index. */
+    /* 在 leaf node level 的 page 中检索. */
     page_cur_search_with_match_bytes(block, index, tuple, page_mode, &up_match,
                                      &up_bytes, &low_match, &low_bytes,
                                      page_cursor);
   } else {
     /* Search for complete index fields. */
     up_bytes = low_bytes = 0;
+    /* 在当前 page 中检索. */
     page_cur_search_with_match(block, index, tuple, page_mode, &up_match,
                                &low_match, page_cursor,
                                need_path ? cursor->rtr_info : nullptr);
@@ -1288,11 +1309,13 @@ retry_page_get:
   }
 
   if (level != height) {
+    /* 目标 level 仍与当前 height 不匹配. */
     const rec_t *node_ptr;
     ut_ad(height > 0);
 
     height--;
 
+    /* 获取 node pointer. */
     node_ptr = page_cur_get_rec(page_cursor);
 
     offsets = rec_get_offsets(node_ptr, index, offsets, ULINT_UNDEFINED, &heap);
@@ -1456,6 +1479,7 @@ retry_page_get:
     }
 
     if (height == level && latch_mode == BTR_MODIFY_TREE) {
+      /* BTR_MODIFY_TREE 到达目标层级. */
       ut_ad(upper_rw_latch == RW_X_LATCH);
       /* we should sx-latch root page, if released already.
       It contains seg_header. */
@@ -1578,6 +1602,7 @@ retry_page_get:
       }
     }
 
+    /* 跳转到 search_loop. */
     goto search_loop;
   } else if (!dict_index_is_spatial(index) && latch_mode == BTR_MODIFY_TREE &&
              lock_intention == BTR_INTENTION_INSERT &&
