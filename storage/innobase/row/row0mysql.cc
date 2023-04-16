@@ -1560,7 +1560,7 @@ static dberr_t row_insert_for_mysql_using_ins_graph(const byte *mysql_rec,
   row_get_prebuilt_insert_row(prebuilt);
   node = prebuilt->ins_node;
 
-  /* 将 record 从 sql 格式转换为 InnoDB 层格式. */
+  /* 将 record 从 sql 层格式转换为 InnoDB 层格式. */
   row_mysql_convert_row_to_innobase(node->row, prebuilt, mysql_rec, &blob_heap);
 
   savept = trx_savept_take(trx);

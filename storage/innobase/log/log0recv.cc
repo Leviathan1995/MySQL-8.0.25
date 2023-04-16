@@ -3255,6 +3255,7 @@ static bool recv_sys_add_to_parsing_buf(const byte *log_block,
   ut_ad(start_offset <= end_offset);
 
   if (start_offset < end_offset) {
+    /* 拷贝至 recv_sys->buf. */
     memcpy(recv_sys->buf + recv_sys->len, log_block + start_offset,
            end_offset - start_offset);
 
@@ -3359,6 +3360,7 @@ bool meb_scan_log_recs(
       }
     }
 
+    /* 读取当前 redo log block 的数据长度. */
     ulint data_len = log_block_get_data_len(log_block);
 
     if (scanned_lsn + data_len > recv_sys->scanned_lsn &&
@@ -3694,6 +3696,7 @@ static void recv_recovery_begin(log_t &log, lsn_t *contiguous_lsn) {
       UNIV_PAGE_SIZE * (buf_pool_get_n_pages() -
                         (recv_n_pool_free_frames * srv_buf_pool_instances));
 
+  /* 向下取整 512 bytes. */
   *contiguous_lsn =
       ut_uint64_align_down(*contiguous_lsn, OS_FILE_LOG_BLOCK_SIZE);
 
@@ -3704,9 +3707,10 @@ static void recv_recovery_begin(log_t &log, lsn_t *contiguous_lsn) {
   bool finished = false;
 
   while (!finished) {
+    /* 每次读 2048 bytes. */
     lsn_t end_lsn = start_lsn + RECV_SCAN_SIZE;
 
-    /* 单纯的读 redo log. */
+    /* 直接使用 log.buf 读 redo log, 长度为 RECV_SCAN_SIZE. */
     recv_read_log_seg(log, log.buf, start_lsn, end_lsn);
 
     finished = recv_scan_log_recs(log, max_mem, log.buf, RECV_SCAN_SIZE,
@@ -3923,7 +3927,8 @@ dberr_t recv_recovery_from_checkpoint_start(log_t &log, lsn_t flush_lsn) {
 
   contiguous_lsn = checkpoint_lsn;
 
-  /* 从 checkpoint 文件记录的 lsn 开始进行 recovery. */
+  /* 从 checkpoint 文件记录的 lsn 开始进行 recovery.
+   * 流程: 读到 recv_sys->buf ==> Hash Table ==> (如果超过了 max_memory, 会提前进行apply). */
   recv_recovery_begin(log, &contiguous_lsn);
 
   lsn_t recovered_lsn;
@@ -3975,6 +3980,7 @@ dberr_t recv_recovery_from_checkpoint_start(log_t &log, lsn_t flush_lsn) {
 
   byte *log_buf_block = log.buf + start_lsn % log.buf_size;
 
+  /* 将 recovery 的最后一个 block 内容拷贝至 log_ss->buf, 目的是进行 log_start(). */
   std::memcpy(log_buf_block, recv_sys->last_block, OS_FILE_LOG_BLOCK_SIZE);
 
   if (recv_sys->last_block_first_rec_group != 0 &&
@@ -4019,6 +4025,7 @@ dberr_t recv_recovery_from_checkpoint_start(log_t &log, lsn_t flush_lsn) {
   checkpoint info on disk certain */
 
   if (!srv_read_only_mode) {
+    /* 完成一次 checkpoint. */
     log_files_write_checkpoint(log, checkpoint_lsn);
   }
 

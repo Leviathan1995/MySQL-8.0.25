@@ -4241,6 +4241,7 @@ buf_block_t *Buf_fetch<T>::single_page() {
     block->made_dirty_with_no_latch = m_dirty_with_no_latch;
   }
 
+  /* 为 page 加锁. */
   mtr_add_page(block);
 
   if (m_mode != Page_fetch::PEEK_IF_IN_POOL && m_mode != Page_fetch::SCAN &&

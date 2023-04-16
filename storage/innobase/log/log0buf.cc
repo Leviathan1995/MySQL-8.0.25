@@ -838,6 +838,7 @@ Log_handle log_buffer_reserve(log_t &log, size_t len) {
 
   ut_a(len > 0);
 
+  /* 用 [sn, sn+len] 来计算 lsn. sn 不包括 LOG_BLOCK_TRL_SIZE 和 LOG_BLOCK_TRL_SIZE. */
   /* Reserve space in sequence of data bytes: */
   const sn_t start_sn = log_buffer_s_lock_enter_reserve(log, len);
 
@@ -908,6 +909,7 @@ lsn_t log_buffer_write(log_t &log, const Log_handle &handle, const byte *str,
   outside the log buffer). */
   byte *buf_end = log.buf + log.buf_size;
 
+  /* 计算该 mtr 写入起始位置. */
   /* Pointer to next data byte to set within the log buffer. */
   byte *ptr = log.buf + (start_lsn % log.buf_size);
 
@@ -918,6 +920,7 @@ lsn_t log_buffer_write(log_t &log, const Log_handle &handle, const byte *str,
   Decrease number of bytes to copy (str_len) after some are
   copied. Proceed until number of bytes to copy reaches zero. */
   while (true) {
+    /* 计算在 block 内的起始位置. */
     /* Calculate offset from the beginning of log block. */
     const auto offset = lsn % OS_FILE_LOG_BLOCK_SIZE;
 
