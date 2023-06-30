@@ -779,11 +779,12 @@ void log_update_buf_limit(log_t &log, lsn_t write_lsn) {
   ut_ad(write_lsn <= log.write_lsn.load());
 
   /* 为什么需要 buf_limit_sn ?
-   * log_buffer 的写入方式是 512 字节写入, 所以假如没有限制, 下一个 redo log 可能
-   * 会覆盖当前这个 512 的 buffer 内容，所以为了保证正确性, 将允许写入的 sn 设置为
-   * (log.buf_size_sn - 2 * OS_FILE_LOG_BLOCK_SIZE).
+   * log_buffer 的写入方式是 512 字节写入, 所以假如没有限制, 下一条 redo log 可能
+   * 会回环覆写当前这个 512 的 buffer 内容，所以为了保证正确性, 将允许写入的 sn
+   * 设置为 sn + (log.buf_size_sn - 2 * OS_FILE_LOG_BLOCK_SIZE).
+   *
    * 允许写入的 sn 为当前的 sn + log.buf_size_sn, 即一个完整的 log_buffer 长度, 减去
-   * 两个 OS_FILE_LOG_BLOCK_SIZE 的长度可以保证当前正在写入的 512 字节内容不被覆盖. */
+   * 两个 OS_FILE_LOG_BLOCK_SIZE 的长度可以保证当前正在写入的 512 字节内容不被回环覆写. */
   const sn_t limit_for_end = log_translate_lsn_to_sn(write_lsn) +
                              log.buf_size_sn.load() -
                              2 * OS_FILE_LOG_BLOCK_SIZE;

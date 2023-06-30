@@ -1070,10 +1070,12 @@ bool buf_LRU_scan_and_free_block(buf_pool_t *buf_pool, bool scan_all) {
   mutex_enter(&buf_pool->LRU_list_mutex);
 
   if (use_unzip_list) {
+    /* 首先尝试 evict 压缩 page 中的 decompressed page. */
     freed = buf_LRU_free_from_unzip_LRU_list(buf_pool, scan_all);
   }
 
   if (!freed) {
+    /* 失败后尝试 evict 普通 page. */
     freed = buf_LRU_free_from_common_LRU_list(buf_pool, scan_all);
   }
 

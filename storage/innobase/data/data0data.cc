@@ -465,6 +465,7 @@ big_rec_t *dtuple_convert_big_rec(dict_index_t *index, upd_t *upd,
 
   n_fields = 0;
 
+  /* Record 需要存放在外部 off-page. */
   while (page_zip_rec_needs_ext(
       rec_get_converted_size(index, entry), dict_table_is_comp(index->table),
       dict_index_get_n_fields(index), dict_table_page_size(index->table))) {

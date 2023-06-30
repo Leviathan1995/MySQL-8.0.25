@@ -1526,6 +1526,7 @@ static bool trx_write_serialisation_history(
       auto undo_ptr = &trx->rsegs.m_redo;
       trx_undo_gtid_set(trx, undo_ptr->update_undo, false);
 
+      /* 将 undo log 插入 history list. */
       trx_undo_update_cleanup(trx, undo_ptr, undo_hdr_page, update_rseg_len,
                               (update_rseg_len ? 1 : 0), mtr);
     }

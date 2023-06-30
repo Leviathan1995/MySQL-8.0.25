@@ -3020,6 +3020,7 @@ static ulint srv_do_purge(ulint *n_total_purged) {
       break;
     }
 
+    /* 每 purge 128 次尝试一次 free rollback segments. */
     bool do_truncate = need_explicit_truncate ||
                        srv_shutdown_state.load() == SRV_SHUTDOWN_PURGE ||
                        (++count % srv_purge_rseg_truncate_frequency) == 0;

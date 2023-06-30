@@ -521,6 +521,7 @@ static void trx_purge_truncate_rseg_history(
   rseg_hdr =
       trx_rsegf_get(rseg->space_id, rseg->page_no, rseg->page_size, &mtr);
 
+  /* 获取 undo log header.  */
   hdr_addr = trx_purge_get_log_from_hist(
       flst_get_last(rseg_hdr + TRX_RSEG_HISTORY, &mtr));
 loop:
@@ -534,10 +535,10 @@ loop:
   undo_page = trx_undo_page_get(page_id_t(rseg->space_id, hdr_addr.page),
                                 rseg->page_size, &mtr);
 
-  /* undo log segment 的 header. */
+  /* Undo log 的 header. */
   log_hdr = undo_page + hdr_addr.boffset;
 
-  /* undo log segment 对应的 trx_no. */
+  /* Undo log 的 trx_no. */
   undo_trx_no = mach_read_from_8(log_hdr + TRX_UNDO_TRX_NO);
 
   if (undo_trx_no >= limit->trx_no) {
@@ -1636,6 +1637,7 @@ static void trx_purge_truncate_history(purge_iter_t *limit,
     undo_space->rsegs()->s_lock();
 
     for (auto rseg : *undo_space->rsegs()) {
+      /* 开始 truncate rollback segments. */
       trx_purge_truncate_rseg_history(rseg, limit);
     }
     undo_space->rsegs()->s_unlock();
