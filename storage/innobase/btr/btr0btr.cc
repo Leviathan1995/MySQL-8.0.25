@@ -2826,11 +2826,13 @@ void btr_node_ptr_delete(dict_index_t *index, buf_block_t *block, mtr_t *mtr) {
   /* Delete node pointer on father page */
   btr_page_get_father(index, block, mtr, &cursor);
 
+  /* 从父节点删除. */
   compressed = btr_cur_pessimistic_delete(&err, TRUE, &cursor, BTR_CREATE_FLAG,
                                           false, 0, 0, 0, mtr);
   ut_a(err == DB_SUCCESS);
 
   if (!compressed) {
+    /*  在父节点尝试 merge. */
     btr_cur_compress_if_useful(&cursor, FALSE, mtr);
   }
 }
@@ -3108,6 +3110,7 @@ ibool btr_compress(
     /* The page is the only one on the level, lift the records
     to the father */
 
+    /* 不存在左右节点, 即代表该层只有这一个 Page, 将 record 合并到父节点. */
     merge_block = btr_lift_page_up(index, block, mtr);
     goto func_exit;
   }
@@ -3120,11 +3123,13 @@ ibool btr_compress(
   /* Decide the page to which we try to merge and which will inherit
   the locks */
 
+  /*  首先尝试与左节点 merge. */
   is_left = btr_can_merge_with_page(cursor, left_page_no, &merge_block, mtr);
 
   DBUG_EXECUTE_IF("ib_always_merge_right", is_left = FALSE;);
 retry:
   if (!is_left &&
+      /*  尝试与右节点 merge. */
       !btr_can_merge_with_page(cursor, right_page_no, &merge_block, mtr)) {
     if (!merge_block) {
       merge_page = nullptr;
@@ -3600,6 +3605,7 @@ void btr_discard_page(btr_cur_t *cursor, /*!< in: cursor on the page to discard:
 
   const page_size_t page_size(dict_table_page_size(index->table));
 
+  /*  向左或者向右进行 merge, 如果单独为一层则进行 discard. */
   if (left_page_no != FIL_NULL) {
     merge_block = btr_block_get(page_id_t(space, left_page_no), page_size,
                                 RW_X_LATCH, index, mtr);
@@ -3655,6 +3661,7 @@ void btr_discard_page(btr_cur_t *cursor, /*!< in: cursor on the page to discard:
     rtr_page_get_father(index, block, mtr, cursor, &father_cursor);
     rtr_node_ptr_delete(index, &father_cursor, block, mtr);
   } else {
+    /*  在上一层删除 node ptr. */
     btr_node_ptr_delete(index, block, mtr);
   }
 

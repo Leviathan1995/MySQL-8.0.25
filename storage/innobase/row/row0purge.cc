@@ -248,6 +248,7 @@ static MY_ATTRIBUTE((warn_unused_result)) bool row_purge_remove_clust_if_poss(
 
   /* 假如删除失败后, 需要进行数次重试. */
   for (ulint n_tries = 0; n_tries < BTR_CUR_RETRY_DELETE_N_TIMES; n_tries++) {
+    /* 悲观删除 mode 为(BTR_MODIFY_TREE | BTR_LATCH_FOR_DELETE). */
     if (row_purge_remove_clust_if_poss_low(
             node, BTR_MODIFY_TREE | BTR_LATCH_FOR_DELETE)) {
       return (true);

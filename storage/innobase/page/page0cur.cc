@@ -2423,6 +2423,7 @@ void page_cur_delete_rec(
   page_dir_slot_set_n_owned(cur_dir_slot, page_zip, cur_n_owned - 1);
 
   /* 6. Free the memory occupied by the record */
+  /* 更新 Page 上 PAGE_GARBAGE 的大小. */
   page_mem_free(page, page_zip, current_rec, index, offsets);
 
   /* 7. Now we have decremented the number of owned records of the slot.

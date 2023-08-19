@@ -638,6 +638,29 @@ void btr_cur_search_to_nth_level(
     ulint line,       /*!< in: line where called */
     mtr_t *mtr)       /*!< in: mtr */
 {
+  /*
+   * BTR_MODIFY_TREE:
+   * 遍历过程:
+   * 1. 先对 dict_index_t 加 sx 锁.
+   * 2. 从 root 节点进入, 一路向下遍历, 使用 RW_NO_LATCH 意为不加锁,
+   * 一路遍历下来的 block 会放在 tree_blocks[] 数组中.
+   * 3. 在遍历过程中会一直判断是否会发生分裂(btr_cur_will_modify_tree())
+   * 不会发生分裂的上层 block 都会释放.
+   * 4. 到达 level 1 层时, 将 tree_blocks[] 中保留的 block 进行加锁操作:
+   * root page 加 sx 锁, 其余待 SMO 的 page 加 X 锁.
+   * 5. 继续遍历至 level 0 层, 即 leaf level:
+   * 调用 btr_cur_latch_leaves() 根据 BTR_MODIFY_TREE 模式将左右 page 全部加上 X 锁.
+   *
+   * BTR_MODIFY_LEAF:
+   * 遍历过程:
+   * 1. 先对 dict_index_t 加 s 锁.
+   * 2. 从 root 节点进入, 一路向下遍历, search 过程中的 non-leaf page 加 s 锁,
+   * leaf page 加 x 锁, 一路遍历下来的 block 会放在 tree_blocks[] 数组中.
+   * 3. (height == 0) 到达叶子层后, 开始释放 lock:
+   * 释放 dict_index_t 的 s 锁.
+   * 释放所有上层除了 root page 以外其他 page 的 s 锁, 保留 root page 的 s 锁.
+   *
+   */
   page_t *page = nullptr; /* remove warning */
   buf_block_t *block;
   ulint height;
@@ -872,7 +895,7 @@ void btr_cur_search_to_nth_level(
       }
   }
 
-  /* 根据 latch_mode(BTR_SEARCH_LEAF...) 来判断 root page 的加锁类型,
+  /* 根据 latch_mode(BTR_SEARCH_LEAF BTR_MODIFY_TREE ...) 来判断 root page 的加锁类型,
    * 仅在 b+ tree 的层级只有一层时使用. */
   root_leaf_rw_latch = btr_cur_latch_for_root_leaf(latch_mode);
 
@@ -4594,12 +4617,13 @@ ibool btr_cur_optimistic_delete_func(
   offsets =
       rec_get_offsets(rec, cursor->index, offsets, ULINT_UNDEFINED, &heap);
 
+  /* 是否需要 SMO (merge). */
   no_compress_needed =
       !rec_offs_any_extern(offsets) &&
       btr_cur_can_delete_without_compress(cursor, rec_offs_size(offsets), mtr);
 
   if (no_compress_needed) {
-    /* 针对无需压缩 b tree 的情况. */
+    /* 针对无需压缩 b+ tree 的情况. */
     page_t *page = buf_block_get_frame(block);
     page_zip_des_t *page_zip = buf_block_get_page_zip(block);
 
@@ -4755,6 +4779,7 @@ ibool btr_cur_pessimistic_delete(dberr_t *err, ibool has_reserved_extents,
     /* If there is only one record, drop the whole page in
     btr_discard_page, if this is not the root page */
 
+    /* 需要删除 Page. */
     btr_discard_page(cursor, mtr);
 
     ret = TRUE;
@@ -4770,6 +4795,7 @@ ibool btr_cur_pessimistic_delete(dberr_t *err, ibool has_reserved_extents,
 
   if (level > 0 &&
       UNIV_UNLIKELY(rec == page_rec_get_next(page_get_infimum_rec(page)))) {
+    /*  删除的 record 是 Page 上的第一个, 需要更新父节点的 node ptr. */
     rec_t *next_rec = page_rec_get_next(rec);
 
     if (btr_page_get_prev(page, mtr) == FIL_NULL) {
@@ -4818,8 +4844,10 @@ ibool btr_cur_pessimistic_delete(dberr_t *err, ibool has_reserved_extents,
       so that it is equal to the new leftmost node pointer
       on the page */
 
+      /* 在父节点层更新 node ptr, 也通过悲观删除(btr_cur_pessimistic_delete()). */
       btr_node_ptr_delete(index, block, mtr);
 
+      /* 使用 next_rec 重新构建一个 node ptr. */
       dtuple_t *node_ptr = dict_index_build_node_ptr(
           index, next_rec, block->page.id.page_no(), heap, level);
 

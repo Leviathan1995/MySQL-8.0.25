@@ -959,6 +959,7 @@ dberr_t Parallel_reader::Scan_ctx::create_ranges(const Scan_range &scan_range,
     }
 
     if (!page_rec_is_supremum(page_cur_get_rec(&level_page_cursor))) {
+      /*  在 leaf level 搜索，并新建对应的 page cursor. */
       create_range(ranges, level_page_cursor, mtr);
     }
 
@@ -1214,6 +1215,7 @@ dberr_t Parallel_reader::add_scan(trx_t *trx,
   dberr_t err{DB_SUCCESS};
 
   /* Split at the root node (level == 0). */
+  /* 从 root 层级开始分片. */
   err = scan_ctx->partition(config.m_scan_range, ranges, 0);
 
   if (ranges.empty() || err != DB_SUCCESS) {

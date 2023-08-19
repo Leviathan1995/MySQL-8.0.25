@@ -146,6 +146,10 @@ ibool btr_cur_can_delete_without_compress(
 
   page = btr_cur_get_page(cursor);
 
+  /* 是否需要 SMO(merge) 操作
+   * 1. 删除这条 record 后该 Page 的剩余空间小于 50%(DICT_INDEX_MERGE_THRESHOLD_DEFAULT).
+   * 2. 或者 Page 的前后节点均为 FIL_NULL. (代表这一层只有一个 Page, 没有保留的必要了)
+   * 3. 或者 Page 的 user records 数量小于 2. */
   if ((page_get_data_size(page) - rec_size <
        BTR_CUR_PAGE_COMPRESS_LIMIT(cursor->index)) ||
       ((btr_page_get_next(page, mtr) == FIL_NULL) &&
